@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { iconfig } from "../config/config.js";
+import userModel from "../models/users.model.js";
 
 const tokenGenerator = (user) => {
   if (!user) {
@@ -47,5 +48,70 @@ export const registerUser = async (req, res) => {
   } catch (error) {
     throw new Error(error);
     console.log(error);
+  }
+};
+
+export const loginUser = async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const user = await userModel.findOne({ email });
+
+    if (!user) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: "Invalid password" });
+    }
+
+    const token = tokenGenerator(user);
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+    });
+    return res.status(200).json({
+      message: "Login successful",
+      user: {
+        _id: user._id,
+        fullname: user.fullname,
+        email: user.email,
+        contact: user.contact,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const googleAuthCallback = async (req, res) => {
+  try {
+    const user = req.user;
+
+    console.log("Google user:", user);
+
+    res.redirect("http://localhost:5173/home");
+  } catch (error) {
+    console.error("Error in Google auth callback:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const getMe = async (req, res) => {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ user });
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
